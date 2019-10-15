@@ -676,6 +676,18 @@ if (isset($_SESSION["logged"]) && $_SESSION["logged"]) {
             }
         }
 
+        function getLastError() {
+            if (!$this->sock) {
+                return "Not connected.";
+            }
+
+            if (!$this->sqliMode) {
+                return mysql_error($this->sock);
+            } else {                
+                return mysqli_error($this->sock);
+            }
+        }
+
         function query($query) {
             if (!$this->sock) return false;
 
@@ -683,7 +695,7 @@ if (isset($_SESSION["logged"]) && $_SESSION["logged"]) {
                 return mysql_query($query);   
             } else {
                 return mysqli_query($this->sock, $query);
-            }
+            }        
         }
 
         function fetchRows($result) {
@@ -721,11 +733,17 @@ if (isset($_SESSION["logged"]) && $_SESSION["logged"]) {
                     ///
                     return true;
                 } else {
-                    $sock = mysql_connect($this->dbhost, $this->dbuser, $this->dbpwd, $this->dbname);
+                    $sock = mysql_connect($this->dbhost, $this->dbuser, $this->dbpwd);                    
 
                     if (!$sock) {
                         return mysql_error();
-                    }
+                    }                    
+
+                    if (!empty($this->dbname)) {
+                        if (!mysql_select_db($this->dbname)) {
+                            return mysql_error($sock);
+                        }
+                    }            
 
                     $this->sock = $sock;
 
@@ -745,13 +763,15 @@ if (isset($_SESSION["logged"]) && $_SESSION["logged"]) {
         }
 
         function __destruct() {
-            if ($sock !== false) {
+            if ($this->sock !== false) {
                 if ($this->sqliMode) {
                     mysqli_close($this->sock);
                 } else {
                     mysql_close($this->sock);
                 }
             }
+
+            $this->sock = null;
         }
     }
 
@@ -786,12 +806,13 @@ if (isset($_SESSION["logged"]) && $_SESSION["logged"]) {
                 }            
                 $db_table .= "</tbody></table>";
             } else {
-                $db_message = "Error in query \"" . htmlspecialchars($dbquery) . "\"";
+                $db_message = $db->getLastError();
             }
         } else {
             $db_message = $result;
         }
-    }
+        unset($db);
+    }    
 
     if (!empty($db_message)) {
         echo "<div class=\"alert alert-$db_alert_class\">";
